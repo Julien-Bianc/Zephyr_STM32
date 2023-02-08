@@ -18,16 +18,16 @@ LOG_MODULE_REGISTER(app);
 #define STACKSIZE (4096)
 static K_THREAD_STACK_DEFINE(led0_stack, STACKSIZE);
 static K_THREAD_STACK_DEFINE(led1_stack, STACKSIZE);
-static K_THREAD_STACK_DEFINE(led3_stack, STACKSIZE);
+static K_THREAD_STACK_DEFINE(sw0_stack, STACKSIZE);
 
 /* The devicetree node identifier for the "led0" alias. */
 #define LED0_NODE DT_ALIAS(led0)
 #define LED1_NODE DT_ALIAS(led1)
-#define LED3_NODE DT_ALIAS(led3)
+#define SW0_NODE DT_ALIAS(sw0)
 static const struct gpio_dt_spec led0 = GPIO_DT_SPEC_GET(LED0_NODE, gpios);
 static const struct gpio_dt_spec led1 = GPIO_DT_SPEC_GET(LED1_NODE, gpios);
-//static const struct gpio_dt_spec sw0 = GPIO_DT_SPEC_GET_OR(SW0_NODE, gpios, {0});
-//static struct gpio_callback sw0_cb_data;
+static const struct gpio_dt_spec sw0 = GPIO_DT_SPEC_GET_OR(SW0_NODE, gpios, {0});
+static struct gpio_callback sw0_cb_data;
 
 K_MUTEX_DEFINE(mutexLEDs);
 int switchPushed = 0;
@@ -70,21 +70,6 @@ static void led1_task(void *p1, void *p2, void *p3)
 	}
 }
 
-static void led3_task(void *p1, void *p2, void *p3)
-{
-	int i, nbIter = 300000;
-	while (1)
-	{
-		for (i = 0; i < nbIter; i++)
-		{
-			update_leds(1, 1);
-		}
-		update_leds(0, 0);
-		k_msleep(3000);
-	}
-}
-
-/*
 static void sw0_task(void *p1, void *p2, void *p3)
 {
 	int i, nbIter = 500000;
@@ -110,7 +95,7 @@ void sw0_pressed_callback(const struct device *dev, struct gpio_callback *cb, ui
 	{
 		switchPushed = 1;
 	}
-}*/
+}
 
 uint8_t init_leds()
 {
@@ -129,7 +114,6 @@ uint8_t init_leds()
 	return returned;
 }
 
-/*
 uint8_t init_switches()
 {
 	uint8_t returned = 0;
@@ -160,15 +144,13 @@ uint8_t init_switches()
 
 	LOG_INF("Set up switch at %s pin %d", sw0.port->name, sw0.pin);
 	return returned;
-}*/
-
-
+}
 
 void main(void)
 {
-	struct k_thread led0_t, led1_t, led3_t;
+	struct k_thread led0_t, led1_t, sw0_t;
 
-	if (init_leds() < 0)
+	if (init_leds() < 0 || init_switches() < 0)
 	{
 		LOG_ERR("Error: %s", "LED or Switch init failed");
 		return;
@@ -179,8 +161,8 @@ void main(void)
 					1, 0, K_NO_WAIT);
 	k_thread_create(&led1_t, led1_stack, K_THREAD_STACK_SIZEOF(led1_stack),
 					led1_task, NULL, NULL, NULL,
-					1, 0, K_NO_WAIT);
-	k_thread_create(&led3_t, led3_stack, K_THREAD_STACK_SIZEOF(led3_stack),
-					led3_task, NULL, NULL, NULL,
-					1, 0, K_NO_WAIT);
+					2, 0, K_NO_WAIT);
+	k_thread_create(&sw0_t, sw0_stack, K_THREAD_STACK_SIZEOF(sw0_stack),
+					sw0_task, NULL, NULL, NULL,
+					3, 0, K_NO_WAIT);
 }
